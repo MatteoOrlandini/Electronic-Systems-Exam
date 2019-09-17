@@ -1,4 +1,4 @@
-MPASM 5.84                          MAIN.ASM   9-7-2019  17:52:21         PAGE  1
+MPASM 5.84                          MAIN.ASM   9-12-2019  16:01:04         PAGE  1
 
 
 LOC  OBJECT CODE     LINE SOURCE TEXT
@@ -46,18 +46,18 @@ LOC  OBJECT CODE     LINE SOURCE TEXT
                       00008 ;==========================================================================
                       00009 
                       00810         LIST
-                      00033                 ;#include "macro.inc"  ; definizione di macro utili
-                      00034 
+                      00033                 list p=16f887
+                      00034                         
                       00035                 ; configuration bits
                       00036                 ;_INTRC_OSC_NOCLKOUT : oscillatore interno senza uscita di clock
                       00037                 ;_WDT_OFF : disabilita il Watchdog Timer
-                      00038                 ;_LVP_OFF : disabilita la programmazione a bassa tensione permettendo l
-                      00039                 ;uso della PORTB dopo la programmazione
+                      00038                 ;_LVP_OFF : disabilita la programmazione a bassa tensione permettendo
+                      00039                 ;l'uso della PORTB dopo la programmazione
 2007   2FF4           00040                 __CONFIG _CONFIG1, _INTRC_OSC_NOCLKOUT & _WDT_OFF & _LVP_OFF
                       00041                 ;_BOR21V : Brown-out Reset settato a 2.1V
 2008   3EFF           00042                 __CONFIG _CONFIG2, _BOR21V
                       00043 
-MPASM 5.84                          MAIN.ASM   9-7-2019  17:52:21         PAGE  2
+MPASM 5.84                          MAIN.ASM   9-12-2019  16:01:04         PAGE  2
 
 
 LOC  OBJECT CODE     LINE SOURCE TEXT
@@ -65,10 +65,10 @@ LOC  OBJECT CODE     LINE SOURCE TEXT
 
                       00044                 ; variabili in RAM (shared RAM)
                       00045                 udata_shr
-0000                  00046 puntatoreChar   res     .1
-0001                  00047 numeroChar      res     .1 
-0002                  00048 rxData          res     .1
-                      00049 
+                      00046 ;puntatoreChar  res     .1
+0000                  00047 numeroChar      res     .1 
+0001                  00048 numeroMassimo   res     .1
+0002                  00049 rxData          res     .1
                       00050         
                       00051                 ; reset vector
                       00052 rst_vector              code    0x0000
@@ -79,259 +79,278 @@ LOC  OBJECT CODE     LINE SOURCE TEXT
                       00057                 ; programma principale
                       00058                 code
 0000                  00059 start
-0000   3000           00060                 movlw .0
-0001   00??           00061                 movwf numeroChar
-                      00062                 ;inizializzo il puntatore al vettore che contiene i caratteri
-                      00063                 ;per contenere l'indirizzo 0x20, cioè il primo general purpose
-                      00064                 ;file register
-0002   3020           00065                 movlw 0x20
-0003   0084           00066                 movwf FSR
-0004   ???? ????      00067                 pagesel initHw
-                      00068                 ;initHw contiene le inizializzazioni hardware
-0006   2???           00069                 call initHw      
-0007                  00070 mainLoop        
-                      00071                 ;abilitazione seriale e ricezione continua
-0007   1283 1303      00072                 banksel RCSTA
-0009   1798           00073                 bsf RCSTA, SPEN
-000A   1618           00074                 bsf RCSTA, CREN
-000B   1283 1303      00075                 banksel PIR1
-                      00076                 ;se RCIF è a 1 allora è stato ricevuto un byte da seriale
-000D   1E8C           00077                 btfss PIR1, RCIF
-000E   2???           00078                 goto $-1
-                      00079                 ;lettura del bit di Framing Error, se è ad uno si può resettare
-                      00080                 ;portando a zero il bit SPEN di RCSTA che resetta la EUSART
-000F   1283 1303      00081                 banksel RCSTA
-0011   1918           00082                 btfsc RCSTA, FERR
-0012   1398           00083                 bcf RCSTA, SPEN
-                      00084                 ;lettura del contenuto di RCREG
-                      00085                 ;per resettare l'interrupt RCIF
-0013   1283 1303      00086                 banksel RCREG
-0015   081A           00087                 movf RCREG,w
-0016   00??           00088                 movwf rxData
-                      00089                 ;metto il contenuto di RCREG nel vettore che contiene i caratteri
-0017   0080           00090                 movwf INDF
-                      00091                 ;incremento il puntatore
-0018   0A84           00092                 incf FSR, f
-                      00093                 ;incremento la variabile che conta i caratteri
-0019   0A??           00094                 incf numeroChar, f
-                      00095                 ;se si è verificato un over run, cioè il bit OERR di RCSTA è 
-                      00096                 ;a uno, si resetta il flag portando a zero il bit CREN di RCSTA
-MPASM 5.84                          MAIN.ASM   9-7-2019  17:52:21         PAGE  3
+                      00060                 ;inizializzo la variabile che conta i caratteri ricevuti
+0000   3000           00061                 movlw .0
+0001   00??           00062                 movwf numeroChar
+                      00063                 ;inizializzo la variabile che contiene il numero massimo di 
+                      00064                 ;caratteri che si possono ricevere
+0002   300A           00065                 movlw .10
+0003   00??           00066                 movwf numeroMassimo
+                      00067                 
+                      00068                 ;inizializzo il puntatore al vettore che contiene i caratteri
+                      00069                 ;bankisel puntatoreChar
+                      00070                 ;movlw puntatoreChar 
+                      00071                 ;movwf FSR
+                      00072                 
+                      00073                 ;inizializzo il puntatore al vettore che contiene i caratteri
+                      00074                 ;per contenere l'indirizzo 0x20, cioè il primo general purpose
+                      00075                 ;file register
+0004   3020           00076                 movlw 0x20 
+0005   0084           00077                 movwf FSR
+                      00078                 
+0006   ???? ????      00079                 pagesel initHw
+                      00080                 ;initHw contiene le inizializzazioni hardware
+0008   2???           00081                 call initHw      
+0009                  00082 mainLoop        
+                      00083                 ;abilitazione seriale e ricezione continua
+0009   1283 1303      00084                 banksel RCSTA
+000B   1798           00085                 bsf RCSTA, SPEN
+000C   1618           00086                 bsf RCSTA, CREN
+000D   1283 1303      00087                 banksel PIR1
+                      00088                 ;se RCIF è a 1 allora è stato ricevuto un byte da seriale
+000F   1E8C           00089                 btfss PIR1, RCIF
+0010   2???           00090                 goto $-1
+                      00091                 ;lettura del bit di Framing Error, se è ad uno si può resettare
+                      00092                 ;portando a zero il bit SPEN di RCSTA che resetta la EUSART
+0011   1283 1303      00093                 banksel RCSTA
+0013   1918           00094                 btfsc RCSTA, FERR
+0014   1398           00095                 bcf RCSTA, SPEN
+                      00096                 ;lettura del contenuto di RCREG
+MPASM 5.84                          MAIN.ASM   9-12-2019  16:01:04         PAGE  3
 
 
 LOC  OBJECT CODE     LINE SOURCE TEXT
   VALUE
 
-001A   1283 1303      00097                 banksel RCSTA
-001C   1898           00098                 btfsc RCSTA, OERR
-001D   1218           00099                 bcf RCSTA, CREN
-                      00100                 ;se il byte ricevuto è un punto la parola è terminata
-001E   302E           00101                 movlw '.'
-                      00102                 ;confronta il dato ricevuto con '.'
-001F   02??           00103                 subwf rxData, w
-0020   1903           00104                 btfsc STATUS,Z  
-                      00105                 ;se il carattere ricevuto è '.', chiama TXEUSART
-0021   2???           00106                 call TXEUSART 
-0022   2???           00107                 goto mainLoop
-                      00108 
-0023                  00109 TXEUSART        
-                      00110                 ;resetto il bit SYNC di TXSTA (trasmissione asincrona)
-                      00111                 ;banksel TXSTA
-                      00112                 ;bcf TXSTA, 4
-0023   1283 1303      00113                 banksel RCSTA
-0025   1618           00114                 bsf RCSTA, CREN
-                      00115                 ;abilitazione della trasmissione seriale
-0026   1683 1303      00116                 banksel TXSTA
+                      00097                 ;per resettare l'interrupt RCIF
+0015   1283 1303      00098                 banksel RCREG
+0017   081A           00099                 movf RCREG,w
+                      00100                 ;metto il contenuto di RCREG in rxData
+0018   00??           00101                 movwf rxData
+                      00102                 ;metto il contenuto di RCREG nel vettore che contiene i caratteri
+0019   0080           00103                 movwf INDF
+                      00104                 ;incremento il puntatore
+001A   0A84           00105                 incf FSR, f
+                      00106                 ;incremento la variabile che conta i caratteri
+001B   0A??           00107                 incf numeroChar, f
+                      00108                 ;se si è verificato un over run, cioè il bit OERR di RCSTA è 
+                      00109                 ;a uno, si resetta il flag portando a zero il bit CREN di RCSTA
+001C   1283 1303      00110                 banksel RCSTA
+001E   1898           00111                 btfsc RCSTA, OERR
+001F   1218           00112                 bcf RCSTA, CREN
+                      00113                 ;se i caratteri ricevuti sono maggiori del numeroMassimo allora
+                      00114                 ;li invio sulla seriale
+0020   08??           00115                 movf numeroMassimo, w
+0021   02??           00116                 subwf numeroChar, w
+0022   1903           00117                 btfsc STATUS, Z 
+0023   2???           00118                 call TXEUSART
+                      00119                 
+                      00120                 ;se il byte ricevuto è un punto la parola è terminata
+0024   302E           00121                 movlw '.'
+                      00122                 ;confronta il dato ricevuto con '.'
+0025   02??           00123                 subwf rxData, w
+0026   1903           00124                 btfsc STATUS, Z  
+                      00125                 ;se il carattere ricevuto è '.', chiama TXEUSART
+0027   2???           00126                 call TXEUSART
+0028   2???           00127                 goto mainLoop
+                      00128 
+0029                  00129 TXEUSART        
+                      00130                 ;resetto il bit SYNC di TXSTA (trasmissione asincrona)
+0029   1683 1303      00131                 banksel TXSTA
 Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
-0028   1698           00117                 bsf TXSTA, TXEN                 
-0029                  00118 invioDati       ;decremento il puntatore
-0029   0384           00119                 decf FSR, f
-                      00120                 ;metto il contenuto di ogni elemento del vettore in w
-002A   0800           00121                 movf INDF, w
-                      00122                 ;TXIF è a 1 quando il buffer di trasmissione EUSART è vuoto
-002B   1283 1303      00123                 banksel PIR1
-002D   1E0C           00124                 btfss PIR1, TXIF
-002E   2???           00125                 goto $-1
-                      00126                 ;scrivo w (numeroChar) in TXREG
-002F   1283 1303      00127                 banksel TXREG
-0031   0099           00128                 movwf TXREG
-                      00129                 ;se TRMT (Transmit Shift Register) è vuoto allora vai al main loop
-                      00130                 ;banksel TXSTA
-                      00131                 ;btfsc TXSTA, TRMT
-                      00132                 ;goto $-1
+002B   1218           00132                 bcf TXSTA, SYNC
+002C   1283 1303      00133                 banksel RCSTA
+002E   1618           00134                 bsf RCSTA, CREN
+                      00135                 ;abilitazione della trasmissione seriale
+002F   1683 1303      00136                 banksel TXSTA
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0031   1698           00137                 bsf TXSTA, TXEN         
+                      00138                 
+0032                  00139 invioDati       
+                      00140                 ;decremento il puntatore
+0032   0384           00141                 decf FSR, f
+                      00142                 ;metto il contenuto di ogni elemento del vettore in w
+0033   0800           00143                 movf INDF, w
+                      00144                 ;TXIF è a 1 quando il buffer di trasmissione EUSART è vuoto
+0034   1283 1303      00145                 banksel PIR1
+0036   1E0C           00146                 btfss PIR1, TXIF
+0037   2???           00147                 goto $-1
+MPASM 5.84                          MAIN.ASM   9-12-2019  16:01:04         PAGE  4
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00148                 ;scrivo w (numeroChar) in TXREG
+0038   1283 1303      00149                 banksel TXREG
+003A   0099           00150                 movwf TXREG
 Message[305]: Using default destination of 1 (file).
-0032   0B??           00133                 decfsz numeroChar
-0033   2???           00134                 goto invioDati
-0034   0008           00135                 return
-                      00136 
-                      00137 
-0035                  00138 initHw
-                      00139                 ;*********** inizio configurazioni hardware  *******************                
-                      00140                 
-                      00141                 ;**********  inizio configurazione interrupt  ******************
-0035   3000           00142                 movlw B'00000000'
-0036   1283 1303      00143                 banksel INTCON
-                      00144                 ;INTCON:
-                      00145                 ;bit 7 = 0 -> disabilitazione di tutti gli interrupt
-                      00146                 ;bit 6 = 0 -> disabilitazione interrupt dalle periferiche
-                      00147                 ;bit 5 = 0 -> disabilitazione interrupt timer 0
-MPASM 5.84                          MAIN.ASM   9-7-2019  17:52:21         PAGE  4
-
-
-LOC  OBJECT CODE     LINE SOURCE TEXT
-  VALUE
-
-                      00148                 ;bit 4 = 0 -> disabilitazione interrupt esterno 
-                      00149                 ;bit 3 = 0 -> disabilitazione interrupt porta B
-                      00150                 ;bit 2 = 0 -> reset del flag interrupt timer 0 
-                      00151                 ;bit 1 = 0 -> reset del flag interrupt esterno
-                      00152                 ;bit 0 = 0 -> reset del flag interrupt porta B
-0038   008B           00153                 movwf INTCON
+003B   0B??           00151                 decfsz numeroChar
+003C   2???           00152                 goto invioDati
+003D   0008           00153                 return
                       00154 
-0039   3000           00155                 movlw B'00000000'
-003A   1683 1303      00156                 banksel PIE1
-                      00157                 ;PIE1
-                      00158                 ;bit 7 = 0 -> non implementato
-                      00159                 ;bit 6 = 0 -> disabilitazione interrupt ADC
-                      00160                 ;bit 5 = 0 -> disabilitazione interrupt EUSART in ricezione
-                      00161                 ;bit 4 = 0 -> disabilitazione interrupt EUSART in trasmissione
-                      00162                 ;bit 3 = 0 -> disabilitazione interrupt MSSP
-                      00163                 ;bit 2 = 0 -> disabilitazione interrupt CCP1
-                      00164                 ;bit 1 = 0 -> disabilitazione interrupt Timer 2 = PR2
-                      00165                 ;bit 0 = 0 -> disabilitazione interrupt overflow Timer 1
+                      00155 
+003E                  00156 initHw
+                      00157                 ;*********** inizio configurazioni hardware  *******************                
+                      00158                 
+                      00159                 ;**********  inizio configurazione interrupt  ******************
+003E   3000           00160                 movlw B'00000000'
+003F   1283 1303      00161                 banksel INTCON
+                      00162                 ;INTCON:
+                      00163                 ;bit 7 = 0 -> disabilitazione di tutti gli interrupt
+                      00164                 ;bit 6 = 0 -> disabilitazione interrupt dalle periferiche
+                      00165                 ;bit 5 = 0 -> disabilitazione interrupt timer 0
+                      00166                 ;bit 4 = 0 -> disabilitazione interrupt esterno 
+                      00167                 ;bit 3 = 0 -> disabilitazione interrupt porta B
+                      00168                 ;bit 2 = 0 -> reset del flag interrupt timer 0 
+                      00169                 ;bit 1 = 0 -> reset del flag interrupt esterno
+                      00170                 ;bit 0 = 0 -> reset del flag interrupt porta B
+0041   008B           00171                 movwf INTCON
+                      00172 
+0042   3000           00173                 movlw B'00000000'
+0043   1683 1303      00174                 banksel PIE1
+                      00175                 ;PIE1
+                      00176                 ;bit 7 = 0 -> non implementato
+                      00177                 ;bit 6 = 0 -> disabilitazione interrupt ADC
+                      00178                 ;bit 5 = 0 -> disabilitazione interrupt EUSART in ricezione
+                      00179                 ;bit 4 = 0 -> disabilitazione interrupt EUSART in trasmissione
+                      00180                 ;bit 3 = 0 -> disabilitazione interrupt MSSP
+                      00181                 ;bit 2 = 0 -> disabilitazione interrupt CCP1
+                      00182                 ;bit 1 = 0 -> disabilitazione interrupt Timer 2 = PR2
+                      00183                 ;bit 0 = 0 -> disabilitazione interrupt overflow Timer 1
 Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
-003C   008C           00166                 movwf PIE1
-                      00167                 ;***********  fine configurazione interrupt  *******************
-                      00168                 
-                      00169                 ;***********  inizio configurazione clock  *********************
-003D   3071           00170                 movlw B'01110001'
-003E   1683 1303      00171                 banksel OSCCON
-                      00172                 ;OSCCON:
-                      00173                 ;bit 7 = non implementato
-                      00174                 ;bit 6-4 = 111 -> oscillatore interno a 8 MHz
-                      00175                 ;bit 3 = 0 -> il PIC lavore con l'oscillatore interno (solo lettura)
-                      00176                 ;bit 2 = 0 -> HFINTOSC non stabile (solo lettura)
-                      00177                 ;bit 1 = 0 -> LFINTOSC non stabile (solo lettura)
-                      00178                 ;bit 0 = 1 -> oscillatore interno usato come clock di sistema
+0045   008C           00184                 movwf PIE1
+                      00185                 ;***********  fine configurazione interrupt  *******************
+                      00186                 
+                      00187                 ;***********  inizio configurazione clock  *********************
+0046   3071           00188                 movlw B'01110001'
+0047   1683 1303      00189                 banksel OSCCON
+                      00190                 ;OSCCON:
+                      00191                 ;bit 7 = non implementato
+                      00192                 ;bit 6-4 = 111 -> oscillatore interno a 8 MHz
+                      00193                 ;bit 3 = 0 -> il PIC lavore con l'oscillatore interno (solo lettura)
+                      00194                 ;bit 2 = 0 -> HFINTOSC non stabile (solo lettura)
+                      00195                 ;bit 1 = 0 -> LFINTOSC non stabile (solo lettura)
+                      00196                 ;bit 0 = 1 -> oscillatore interno usato come clock di sistema
 Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
-0040   008F           00179                 movwf OSCCON
-                      00180 
-0041   3007           00181                 movlw B'00000111'
-0042   1683 1303      00182                 banksel OPTION_REG
-                      00183                 ;OPTION_REG:
-                      00184                 ;bit 7 = 0 -> pull up abilitato sulla porta b
-                      00185                 ;bit 6 = 0 -> interrupt sul fronte di discesa 
-                      00186                 ;bit 5 = 0 -> clock interno (Fosc/4)
-                      00187                 ;bit 4 = 0 -> incremento del Timer 0 sulla transizione basso-alto
-                      00188                 ;del pin T0CKI
-                      00189                 ;bit 3 = 0 -> prescaler assegnato al Watch Dog Timer
-                      00190                 ;bit 2-0 = 111 Prescaler 1:256
-                      00191                 ; -> Ftick = (8 MHz / 4) / 256 = 7812.5 Hz, tick = 128us, periodo = 32.768 ms
-Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
-0044   0081           00192                 movwf OPTION_REG
-                      00193                 ;************  fine configurazione clock  **********************
-                      00194                 
-                      00195                 ;************  inizio configurazione porte  ********************
-                      00196                 ;port A: non usata, input
-0045   30FF           00197                 movlw B'11111111'
-MPASM 5.84                          MAIN.ASM   9-7-2019  17:52:21         PAGE  5
+0049   008F           00197                 movwf OSCCON
+MPASM 5.84                          MAIN.ASM   9-12-2019  16:01:04         PAGE  5
 
 
 LOC  OBJECT CODE     LINE SOURCE TEXT
   VALUE
 
-0046   1683 1303      00198                 banksel TRISA
+                      00198 
+004A   3007           00199                 movlw B'00000111'
+004B   1683 1303      00200                 banksel OPTION_REG
+                      00201                 ;OPTION_REG:
+                      00202                 ;bit 7 = 0 -> pull up abilitato sulla porta b
+                      00203                 ;bit 6 = 0 -> interrupt sul fronte di discesa 
+                      00204                 ;bit 5 = 0 -> clock interno (Fosc/4)
+                      00205                 ;bit 4 = 0 -> incremento del Timer 0 sulla transizione basso-alto
+                      00206                 ;del pin T0CKI
+                      00207                 ;bit 3 = 0 -> prescaler assegnato al Watch Dog Timer
+                      00208                 ;bit 2-0 = 111 Prescaler 1:256
+                      00209                 ; -> Ftick = (8 MHz / 4) / 256 = 7812.5 Hz, tick = 128us, periodo = 32.768 ms
 Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
-0048   0085           00199                 movwf TRISA
-                      00200 
-                      00201                 ;port B: non usata, input
-0049   30FF           00202                 movlw B'11111111'
-004A   1683 1303      00203                 banksel TRISB
+004D   0081           00210                 movwf OPTION_REG
+                      00211                 ;************  fine configurazione clock  **********************
+                      00212                 
+                      00213                 ;************  inizio configurazione porte  ********************
+                      00214                 ;port A: non usata, input
+004E   30FF           00215                 movlw B'11111111'
+004F   1683 1303      00216                 banksel TRISA
 Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
-004C   0086           00204                 movwf TRISB
-                      00205                 
-                      00206                 ;port C: RC6 e RC7 usate per la seriale
-004D   30FF           00207                 movlw B'11111111'
-004E   1683 1303      00208                 banksel TRISC
+0051   0085           00217                 movwf TRISA
+                      00218 
+                      00219                 ;port B: non usata, input
+0052   30FF           00220                 movlw B'11111111'
+0053   1683 1303      00221                 banksel TRISB
 Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
-0050   0087           00209                 movwf TRISC
-                      00210 
-                      00211                 ;port D: non usata, input
-0051   30FF           00212                 movlw B'11111111'
-0052   1683 1303      00213                 banksel TRISD
+0055   0086           00222                 movwf TRISB
+                      00223                 
+                      00224                 ;port C: RC6 e RC7 usate per la seriale
+0056   30FF           00225                 movlw B'11111111'
+0057   1683 1303      00226                 banksel TRISC
 Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
-0054   0088           00214                 movwf TRISD
-                      00215                 
-                      00216                 ;port E: non usata, input
-0055   300F           00217                 movlw B'00001111'
-0056   1683 1303      00218                 banksel TRISE
+0059   0087           00227                 movwf TRISC
+                      00228 
+                      00229                 ;port D: non usata, input
+005A   30FF           00230                 movlw B'11111111'
+005B   1683 1303      00231                 banksel TRISD
 Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
-0058   0089           00219                 movwf TRISE
-                      00220                 ;**************  fine configurazione porte  ********************
-                      00221                 
-                      00222                 ;**************  inizio configurazioni USART  ******************
-0059   3024           00223                 movlw B'00100100'
-005A   1683 1303      00224                 banksel TXSTA
-                      00225                 ;TXSTA:
-                      00226                 ;bit 7 = 0 -> don't care perchè usart in modalità asincrona
-                      00227                 ;bit 6 = 0 -> trasmissione a 8 bit
-                      00228                 ;bit 5 (TXEN) = 1 -> trasmissione abilitata
-                      00229                 ;bit 4 (SYNC) = 0 -> modalità asincrona
-                      00230                 ;bit 3 = 0 -> Sync Break transmission completata
-                      00231                 ;bit 2 = 1 -> Baud rate alta velocità
-                      00232                 ;bit 1 = 0 -> Transmit Shift Register Status bit (solo lettura)
-                      00233                 ;bit 0 = 0 -> contenuto del nono bit (non abilitato)
+005D   0088           00232                 movwf TRISD
+                      00233                 
+                      00234                 ;port E: non usata, input
+005E   300F           00235                 movlw B'00001111'
+005F   1683 1303      00236                 banksel TRISE
 Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
-005C   0098           00234                 movwf TXSTA
-                      00235                 
-005D   3090           00236                 movlw B'10010000'
-005E   1283 1303      00237                 banksel RCSTA
-                      00238                 ;RCSTA:
-                      00239                 ;bit 7 (SPEN) = 1 -> porta seriale abilitata
-                      00240                 ;bit 6 = 0 -> ricezione a 8 bit
-                      00241                 ;bit 5 = 0 -> don't care perchè usart in modalità asincrona
-                      00242                 ;bit 4 (CREN) = 1 -> ricezione continua abilitata
-                      00243                 ;bit 3 = 0 -> don't care perchè ricezione a 8 bit
-                      00244                 ;bit 2 = 0 -> Framing Error bit (solo lettura)
-MPASM 5.84                          MAIN.ASM   9-7-2019  17:52:21         PAGE  6
+0061   0089           00237                 movwf TRISE
+                      00238                 ;**************  fine configurazione porte  ********************
+                      00239                 
+                      00240                 ;**************  inizio configurazioni USART  ******************
+0062   3024           00241                 movlw B'00100100'
+0063   1683 1303      00242                 banksel TXSTA
+                      00243                 ;TXSTA:
+                      00244                 ;bit 7 = 0 -> don't care perchè usart in modalità asincrona
+MPASM 5.84                          MAIN.ASM   9-12-2019  16:01:04         PAGE  6
 
 
 LOC  OBJECT CODE     LINE SOURCE TEXT
   VALUE
 
-                      00245                 ;bit 1 = 0 -> Overrun Error bit (solo lettura)
-                      00246                 ;bit 0 = 0 -> Nono bit ricevuto, non usato (solo lettura)
-0060   0098           00247                 movwf RCSTA
-                      00248                 
-0061   3000           00249                 movlw B'00000000'
-0062   1683 1703      00250                 banksel BAUDCTL
-                      00251                 ;BAUDCTL:
-                      00252                 ;bit 7 = 0 -> overflow del baud timer (solo lettura)
-                      00253                 ;bit 6 = 0 -> ricezione dello start bit (solo lettura)
-                      00254                 ;bit 5 = 0 (non implementato)
-                      00255                 ;bit 4 = 0 -> Transmissione dei dati non invertiti al pin RB7/TX/CK
-                      00256                 ;bit 3 = 0 -> baud rate a 8 bit
-                      00257                 ;bit 2 = 0 (non implementato)
-                      00258                 ;bit 1 = 0 -> wake up enable bit disabilitato
-                      00259                 ;bit 0 = 0 -> Auto-Baud Detect disabilitato
+                      00245                 ;bit 6 = 0 -> trasmissione a 8 bit
+                      00246                 ;bit 5 (TXEN) = 1 -> trasmissione abilitata
+                      00247                 ;bit 4 (SYNC) = 0 -> modalità asincrona
+                      00248                 ;bit 3 = 0 -> Sync Break transmission completata
+                      00249                 ;bit 2 (BRGH) = 1 -> Baud rate alta velocità
+                      00250                 ;bit 1 = 0 -> Transmit Shift Register Status bit (solo lettura)
+                      00251                 ;bit 0 = 0 -> contenuto del nono bit (non abilitato)
 Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
-0064   0087           00260                 movwf BAUDCTL
-                      00261                 
-                      00262                 ;per avere un baud rate di 19200 occorre scrivere .25 nel 
-                      00263                 ;registro SPBRG perché con Fosc = 8 MHz, SYNC = 0, BRGH = 1, 
-                      00264                 ;BRG16 = 0 si ha BaudRate = Fosc/[16 * (n+1)] e con n = 25,
-                      00265                 ;BaudRate = 19230 bps
-0065   3019           00266                 movlw .25
-0066   1683 1303      00267                 banksel SPBRG
+0065   0098           00252                 movwf TXSTA
+                      00253                 
+0066   3090           00254                 movlw B'10010000'
+0067   1283 1303      00255                 banksel RCSTA
+                      00256                 ;RCSTA:
+                      00257                 ;bit 7 (SPEN) = 1 -> porta seriale abilitata
+                      00258                 ;bit 6 = 0 -> ricezione a 8 bit
+                      00259                 ;bit 5 = 0 -> don't care perchè usart in modalità asincrona
+                      00260                 ;bit 4 (CREN) = 1 -> ricezione continua abilitata
+                      00261                 ;bit 3 = 0 -> don't care perchè ricezione a 8 bit
+                      00262                 ;bit 2 = 0 -> Framing Error bit (solo lettura)
+                      00263                 ;bit 1 = 0 -> Overrun Error bit (solo lettura)
+                      00264                 ;bit 0 = 0 -> Nono bit ricevuto, non usato (solo lettura)
+0069   0098           00265                 movwf RCSTA
+                      00266                 
+006A   3000           00267                 movlw B'00000000'
+006B   1683 1703      00268                 banksel BAUDCTL
+                      00269                 ;BAUDCTL:
+                      00270                 ;bit 7 = 0 -> overflow del baud timer (solo lettura)
+                      00271                 ;bit 6 = 0 -> ricezione dello start bit (solo lettura)
+                      00272                 ;bit 5 = 0 (non implementato)
+                      00273                 ;bit 4 = 0 -> Transmissione dei dati non invertiti al pin RB7/TX/CK
+                      00274                 ;bit 3 (BRG16) = 0 -> baud rate a 8 bit
+                      00275                 ;bit 2 = 0 (non implementato)
+                      00276                 ;bit 1 = 0 -> wake up enable bit disabilitato
+                      00277                 ;bit 0 = 0 -> Auto-Baud Detect disabilitato
 Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
-0068   0099           00268                 movwf SPBRG
-                      00269                 ;*************  fine configurazione USART  *********************
-0069   0008           00270                 return
-                      00271 
-                      00272                 ;************* fine configurazioni hardware  *******************
-                      00273 
-2FF4 3EFF             00274                 end
-MPASM 5.84                          MAIN.ASM   9-7-2019  17:52:21         PAGE  7
+006D   0087           00278                 movwf BAUDCTL
+                      00279                 
+                      00280                 ;per avere un baud rate di 19200 occorre scrivere .25 nel 
+                      00281                 ;registro SPBRG perché con Fosc = 8 MHz, SYNC = 0, BRGH = 1, 
+                      00282                 ;BRG16 = 0 si ha BaudRate = Fosc/[16 * (n+1)] e con n = 25,
+                      00283                 ;BaudRate = 19230 bps
+006E   3019           00284                 movlw .25
+006F   1683 1303      00285                 banksel SPBRG
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0071   0099           00286                 movwf SPBRG
+                      00287                 ;*************  fine configurazione USART  *********************
+0072   0008           00288                 return
+                      00289 
+                      00290                 ;************* fine configurazioni hardware  *******************
+                      00291 
+2FF4 3EFF             00292                 end
+MPASM 5.84                          MAIN.ASM   9-12-2019  16:01:04         PAGE  7
 
 
 SYMBOL TABLE
@@ -390,7 +409,7 @@ BRG6                              00000006
 BRG7                              00000007
 BRG8                              00000000
 BRG9                              00000001
-MPASM 5.84                          MAIN.ASM   9-7-2019  17:52:21         PAGE  8
+MPASM 5.84                          MAIN.ASM   9-12-2019  16:01:04         PAGE  8
 
 
 SYMBOL TABLE
@@ -449,7 +468,7 @@ CHS0                              00000002
 CHS1                              00000003
 CHS2                              00000004
 CHS3                              00000005
-MPASM 5.84                          MAIN.ASM   9-7-2019  17:52:21         PAGE  9
+MPASM 5.84                          MAIN.ASM   9-12-2019  16:01:04         PAGE  9
 
 
 SYMBOL TABLE
@@ -508,7 +527,7 @@ INTF                              00000001
 IOCB                              00000096
 IOCB0                             00000000
 IOCB1                             00000001
-MPASM 5.84                          MAIN.ASM   9-7-2019  17:52:21         PAGE 10
+MPASM 5.84                          MAIN.ASM   9-12-2019  16:01:04         PAGE 10
 
 
 SYMBOL TABLE
@@ -567,7 +586,7 @@ PDC0                              00000000
 PDC1                              00000001
 PDC2                              00000002
 PDC3                              00000003
-MPASM 5.84                          MAIN.ASM   9-7-2019  17:52:21         PAGE 11
+MPASM 5.84                          MAIN.ASM   9-12-2019  16:01:04         PAGE 11
 
 
 SYMBOL TABLE
@@ -626,7 +645,7 @@ RC2                               00000002
 RC3                               00000003
 RC4                               00000004
 RC5                               00000005
-MPASM 5.84                          MAIN.ASM   9-7-2019  17:52:21         PAGE 12
+MPASM 5.84                          MAIN.ASM   9-12-2019  16:01:04         PAGE 12
 
 
 SYMBOL TABLE
@@ -685,7 +704,7 @@ SSPCON2                           00000091
 SSPEN                             00000005
 SSPIE                             00000003
 SSPIF                             00000003
-MPASM 5.84                          MAIN.ASM   9-7-2019  17:52:21         PAGE 13
+MPASM 5.84                          MAIN.ASM   9-12-2019  16:01:04         PAGE 13
 
 
 SYMBOL TABLE
@@ -744,7 +763,7 @@ TOUTPS3                           00000006
 TRISA                             00000085
 TRISA0                            00000000
 TRISA1                            00000001
-MPASM 5.84                          MAIN.ASM   9-7-2019  17:52:21         PAGE 14
+MPASM 5.84                          MAIN.ASM   9-12-2019  16:01:04         PAGE 14
 
 
 SYMBOL TABLE
@@ -799,11 +818,11 @@ TX9                               00000006
 TX9D                              00000000
 TXD8                              00000000
 TXEN                              00000005
-TXEUSART                          00000023
+TXEUSART                          00000029
 TXIE                              00000004
 TXIF                              00000004
 TXREG                             00000019
-MPASM 5.84                          MAIN.ASM   9-7-2019  17:52:21         PAGE 15
+MPASM 5.84                          MAIN.ASM   9-12-2019  16:01:04         PAGE 15
 
 
 SYMBOL TABLE
@@ -846,8 +865,8 @@ WREN                              00000002
 WRERR                             00000003
 WUE                               00000001
 Z                                 00000002
-_.code_000E                       0000000E
-_.code_002E                       0000002E
+_.code_0010                       00000010
+_.code_0037                       00000037
 _BOR21V                           00003EFF
 _BOR40V                           00003FFF
 _BOR4V_BOR21V                     00003EFF
@@ -862,7 +881,7 @@ _BOR_ON                           00003FFF
 _BOR_SBODEN                       00003DFF
 _CONFIG1                          00002007
 _CONFIG2                          00002008
-MPASM 5.84                          MAIN.ASM   9-7-2019  17:52:21         PAGE 16
+MPASM 5.84                          MAIN.ASM   9-12-2019  16:01:04         PAGE 16
 
 
 SYMBOL TABLE
@@ -918,22 +937,22 @@ _WRT_HALF                         000039FF
 _WRT_OFF                          00003FFF
 _XT_OSC                           00003FF9
 __16F887                          00000001
-initHw                            00000035
-invioDati                         00000029
-mainLoop                          00000007
-MPASM 5.84                          MAIN.ASM   9-7-2019  17:52:21         PAGE 17
+initHw                            0000003E
+invioDati                         00000032
+mainLoop                          00000009
+MPASM 5.84                          MAIN.ASM   9-12-2019  16:01:04         PAGE 17
 
 
 SYMBOL TABLE
   LABEL                             VALUE 
 
-numeroChar                        00000001
-puntatoreChar                     00000000
+numeroChar                        00000000
+numeroMassimo                     00000001
 rxData                            00000002
 start                             00000000
 
 Errors   :     0
 Warnings :     0 reported,     0 suppressed
-Messages :    13 reported,     0 suppressed
+Messages :    14 reported,     0 suppressed
 
 

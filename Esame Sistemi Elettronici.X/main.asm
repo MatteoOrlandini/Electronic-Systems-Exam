@@ -30,23 +30,22 @@
 
 
 		#include "p16f887.inc"
-		;#include "macro.inc"  ; definizione di macro utili
-
+		list p=16f887
+			
 		; configuration bits
 		;_INTRC_OSC_NOCLKOUT : oscillatore interno senza uscita di clock
 		;_WDT_OFF : disabilita il Watchdog Timer
-		;_LVP_OFF : disabilita la programmazione a bassa tensione permettendo l
-		;uso della PORTB dopo la programmazione
+		;_LVP_OFF : disabilita la programmazione a bassa tensione permettendo
+		;l'uso della PORTB dopo la programmazione
 		__CONFIG _CONFIG1, _INTRC_OSC_NOCLKOUT & _WDT_OFF & _LVP_OFF
 		;_BOR21V : Brown-out Reset settato a 2.1V
 		__CONFIG _CONFIG2, _BOR21V
 
 		; variabili in RAM (shared RAM)
 		udata_shr
-puntatoreChar	res     .1
 numeroChar	res	.1 
+numeroMassimo	res	.1
 rxData		res	.1
-
 	
 		; reset vector
 rst_vector		code	0x0000
@@ -57,13 +56,20 @@ rst_vector		code	0x0000
 		; programma principale
 		code
 start
+		;inizializzo la variabile che conta i caratteri ricevuti
 		movlw .0
 		movwf numeroChar
+		;inizializzo la variabile che contiene il numero massimo di 
+		;caratteri che si possono ricevere
+		movlw .10
+		movwf numeroMassimo
+		
 		;inizializzo il puntatore al vettore che contiene i caratteri
 		;per contenere l'indirizzo 0x20, cioè il primo general purpose
 		;file register
-		movlw 0x20
+		movlw 0x20 
 		movwf FSR
+		
 		pagesel initHw
 		;initHw contiene le inizializzazioni hardware
 		call initHw      
@@ -85,6 +91,7 @@ mainLoop
 		;per resettare l'interrupt RCIF
 		banksel RCREG
 		movf RCREG,w
+		;metto il contenuto di RCREG in rxData
 		movwf rxData
 		;metto il contenuto di RCREG nel vettore che contiene i caratteri
 		movwf INDF
@@ -97,25 +104,34 @@ mainLoop
 		banksel RCSTA
 		btfsc RCSTA, OERR
 		bcf RCSTA, CREN
+		;se i caratteri ricevuti sono maggiori del numeroMassimo allora
+		;li invio sulla seriale
+		movf numeroMassimo, w
+		subwf numeroChar, w
+		btfsc STATUS, Z 
+		call TXEUSART
+		
 		;se il byte ricevuto è un punto la parola è terminata
 		movlw '.'
 		;confronta il dato ricevuto con '.'
 		subwf rxData, w
-		btfsc STATUS,Z  
+		btfsc STATUS, Z  
 		;se il carattere ricevuto è '.', chiama TXEUSART
-		call TXEUSART 
+		call TXEUSART
 		goto mainLoop
 
 TXEUSART	
 		;resetto il bit SYNC di TXSTA (trasmissione asincrona)
-		;banksel TXSTA
-		;bcf TXSTA, 4
+		banksel TXSTA
+		bcf TXSTA, SYNC
 		banksel RCSTA
 		bsf RCSTA, CREN
 		;abilitazione della trasmissione seriale
 		banksel TXSTA
-		bsf TXSTA, TXEN			
-invioDati	;decremento il puntatore
+		bsf TXSTA, TXEN		
+		
+invioDati	
+		;decremento il puntatore
 		decf FSR, f
 		;metto il contenuto di ogni elemento del vettore in w
 		movf INDF, w
@@ -126,10 +142,6 @@ invioDati	;decremento il puntatore
 		;scrivo w (numeroChar) in TXREG
 		banksel TXREG
 		movwf TXREG
-		;se TRMT (Transmit Shift Register) è vuoto allora vai al main loop
-		;banksel TXSTA
-		;btfsc TXSTA, TRMT
-		;goto $-1
 		decfsz numeroChar
 		goto invioDati
 		return
@@ -228,7 +240,7 @@ initHw
 		;bit 5 (TXEN) = 1 -> trasmissione abilitata
 		;bit 4 (SYNC) = 0 -> modalità asincrona
 		;bit 3 = 0 -> Sync Break transmission completata
-		;bit 2 = 1 -> Baud rate alta velocità
+		;bit 2 (BRGH) = 1 -> Baud rate alta velocità
 		;bit 1 = 0 -> Transmit Shift Register Status bit (solo lettura)
 		;bit 0 = 0 -> contenuto del nono bit (non abilitato)
 		movwf TXSTA
@@ -253,7 +265,7 @@ initHw
 		;bit 6 = 0 -> ricezione dello start bit (solo lettura)
 		;bit 5 = 0 (non implementato)
 		;bit 4 = 0 -> Transmissione dei dati non invertiti al pin RB7/TX/CK
-		;bit 3 = 0 -> baud rate a 8 bit
+		;bit 3 (BRG16) = 0 -> baud rate a 8 bit
 		;bit 2 = 0 (non implementato)
 		;bit 1 = 0 -> wake up enable bit disabilitato
 		;bit 0 = 0 -> Auto-Baud Detect disabilitato
