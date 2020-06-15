@@ -4,3 +4,4 @@
 *.d linguist-detectable=false
 *.o linguist-detectable=false
 *.drawio linguist-detectable=false
+Makefile linguist-detectable=false
